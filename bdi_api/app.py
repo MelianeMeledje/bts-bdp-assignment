@@ -1,12 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
+import os
+import sys
 
 import uvicorn
 from fastapi import FastAPI
 from starlette import status
 from starlette.responses import JSONResponse
 
+script_dir = os.path.dirname( __file__ )
+bdi_dir = os.path.abspath(os.path.join(script_dir, '..'))
+sys.path.append( bdi_dir )
 import bdi_api
 from bdi_api.examples import v0_router
 from bdi_api.s1.exercise import s1
