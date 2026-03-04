@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, HTTPException
 from fastapi.params import Query
 from pydantic import BaseModel
+from pymongo import MongoClient
 
 from bdi_api.settings import Settings
 
@@ -39,7 +40,13 @@ def create_aircraft(position: AircraftPosition) -> dict:
     Collection name: positions
     """
     # TODO: Connect to MongoDB using pymongo.MongoClient(settings.mongo_url)
+    client = MongoClient(settings.mongo_url)
+    db = client["bdi_aircraft"]
+    collection = db["positions"]
+
     # TODO: Insert the position document into the 'positions' collection
+    collection.insert_one(position.model_dump())
+
     # TODO: Return {"status": "ok"}
     return {"status": "ok"}
 
@@ -53,9 +60,20 @@ def aircraft_stats() -> list[dict]:
     Use MongoDB's aggregation pipeline with $group.
     """
     # TODO: Connect to MongoDB
+    client = MongoClient(settings.mongo_url)
+    db = client["bdi_aircraft"]
+    collection = db["positions"]
+
     # TODO: Use collection.aggregate() with $group on 'type' field
+    pipeline = [
+        {"$group": {"_id": "$type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+
+    results = collection.aggregate(pipeline)
+
     # TODO: Return list sorted by count descending
-    return []
+    return [{"type": r["_id"], "count": r["count"]} for r in results]
 
 
 @s6.get("/aircraft/")
@@ -75,9 +93,20 @@ def list_aircraft(
     Use MongoDB's skip() and limit() for pagination.
     """
     # TODO: Connect to MongoDB
+    client = MongoClient(settings.mongo_url)
+    db = client["bdi_aircraft"]
+    collection = db["positions"]
+
     # TODO: Query distinct aircraft, apply skip/limit for pagination
+    skip_value = (page - 1) * page_size
+
+    cursor = (
+        collection.find({}, {"_id": 0, "icao": 1, "registration": 1, "type": 1})
+        .skip(skip_value)
+        .limit(page_size)
+    )
     # TODO: Return list of dicts with icao, registration, type
-    return []
+    return list(cursor)
 
 
 @s6.get("/aircraft/{icao}")
@@ -88,9 +117,21 @@ def get_aircraft(icao: str) -> dict:
     If not found, return 404.
     """
     # TODO: Connect to MongoDB
+    client = MongoClient(settings.mongo_url)
+    db = client["bdi_aircraft"]
+    collection = db["positions"]
+
     # TODO: Find the latest document for this icao (sort by timestamp descending)
+    doc = collection.find_one(
+        {"icao": icao},
+        {"_id": 0},
+        sort=[("timestamp", -1)],
+    )
+
     # TODO: Return 404 if not found
-    return {}
+    if not doc:
+        raise HTTPException(status_code=404, detail="Aircraft not found")
+    return doc
 
 
 @s6.delete("/aircraft/{icao}")
@@ -100,6 +141,12 @@ def delete_aircraft(icao: str) -> dict:
     Returns the number of deleted documents.
     """
     # TODO: Connect to MongoDB
+    client = MongoClient(settings.mongo_url)
+    db = client["bdi_aircraft"]
+    collection = db["positions"]
+
     # TODO: Delete all documents matching the icao
+    result = collection.delete_many({"icao": icao})
+
     # TODO: Return {"deleted": <count>}
-    return {"deleted": 0}
+    return {"deleted": result.deleted_count}
