@@ -98,7 +98,6 @@ STAGE_DATA: dict[str, list[dict]] = {
         {
             "name": "build",
             "status": "skipped",
-            # Pydantic requires datetime, so we use started_at = finished_at = pipeline started_at
             "started_at": PIPELINE_DATA[1]["started_at"],
             "finished_at": PIPELINE_DATA[1]["started_at"],
             "logs_url": "/api/s9/pipelines/run-002/stages/build/logs",
